@@ -1,0 +1,22 @@
+<Window x:Class="GeminiWidget.LoginWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="Iniciar sesión en Gemini"
+        Width="920" Height="660"
+        WindowStartupLocation="CenterScreen"
+        Background="#1E1F22">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="#26272B" Padding="12,8">
+            <TextBlock Foreground="#C9CDD2" FontSize="12" TextWrapping="Wrap"
+                       Text="Inicia sesión con tu cuenta de Google. La sesión se guarda localmente (misma carpeta que usa el widget), así que solo tendrás que hacerlo una vez." />
+        </Border>
+
+        <wv2:WebView2 Grid.Row="1" x:Name="WebView" />
+    </Grid>
+</Window>
