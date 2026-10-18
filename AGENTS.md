@@ -30,8 +30,12 @@ dotnet clean
 - `LoginWindow` usa el **mismo** `CoreWebView2Environment` (mismo `UserDataFolder`),
   por eso comparte cookies/sesión con el WebView oculto. La sesión persiste en
   `%APPDATA%/GeminiWidget/UserContext`.
-- El scraping es **heurístico** (`UsageParser`, por `innerText` + regex): Gemini no
-  expone un contrato estable. Si Google cambia el DOM, ajusta ahí.
+- El scraping usa primero los bloques `data-testid="current-usage"` y
+  `data-testid="weekly-usage"` (ver `ScrapeScript` en `GeminiScraperService`):
+  esa es la fuente fiable. `UsageParser` (por `innerText` + regex) es solo el
+  respaldo si Gemini cambia el marcado. Ojo: la página incluye banners promocionales
+  ("Disfruta de 5 veces más uso…") que contaminaban el scraping por texto; por eso
+  se extrae del bloque con `data-testid`.
 
 ## Gotchas que ya costaron tiempo
 
@@ -46,9 +50,9 @@ dotnet clean
 - `UsageUrls` es una lista que se recorre hasta encontrar datos: no asumas que
   `https://gemini.google.com/usage` es el endpoint correcto (en una sesión sin
   login redirige a `/app`).
-- Depuración del scraping: cada sondeo deja el `innerText` leído en
-  `%APPDATA%\GeminiWidget\last-scan.txt`. Es lo primero que revisar si no
-  aparecen datos o si no se pide iniciar sesión.
+- Depuración del scraping: cada sondeo deja el `innerText` leído y los valores
+  estructurados (`CURRENT`/`WEEKLY`) en `%APPDATA%\GeminiWidget\last-scan.txt`.
+  Es lo primero que revisar si no aparecen datos o si no se pide iniciar sesión.
 - La detección de sesión (`LooksLikeLogin`) depende del idioma de la cuenta:
   español = "Acceder", inglés = "Sign in". Si el widget no pide login en otro
   idioma, añade la variante ahí. La ventana de login `LoginWindow` solo se cierra

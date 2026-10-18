@@ -14,8 +14,8 @@ public static class UsageParser
     private static readonly Regex PercentRegex =
         new(@"(\d{1,3}(?:[.,]\d{1,2})?)\s*%", RegexOptions.Compiled);
 
-    private static readonly Regex ResetRegex =
-        new(@"(?:se\s+restablece|restablece|se\s+renueva|renueva|resets?\s+on|resets?\s+at|resets?|renews?)",
+    private static readonly Regex ResetPhraseRegex =
+        new(@"(?:se\s+restablece|se\s+renueva|resets?|renews?)\b[^\n\r]*",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly string[] CurrentKeywords =
@@ -104,34 +104,16 @@ public static class UsageParser
     {
         for (var i = index; i <= Math.Min(index + 2, lines.Length - 1); i++)
         {
-            var text = lines[i];
-            var keyword = ResetRegex.Match(text);
-            var tail = keyword.Success
-                ? text[(keyword.Index + keyword.Length)..]
-                : (i > index ? text : string.Empty);
+            var match = ResetPhraseRegex.Match(lines[i]);
+            if (!match.Success)
+                continue;
 
-            tail = CleanReset(tail);
-            if (!string.IsNullOrEmpty(tail))
-                return tail;
+            var phrase = match.Value.Trim();
+            if (phrase.Length > 0)
+                return phrase;
         }
 
         return null;
-    }
-
-    private static string CleanReset(string value)
-    {
-        var cleaned = value.Trim().TrimStart(':', '-', '–', '—').Trim();
-
-        var percent = cleaned.IndexOf('%');
-        if (percent >= 0 && percent < cleaned.Length - 1)
-            cleaned = cleaned[(percent + 1)..].Trim().TrimStart(':', '-', '–', '—').Trim();
-
-        var stop = cleaned.IndexOfAny(new[] { '\n', '.', '|' });
-        if (stop >= 0)
-            cleaned = cleaned[..stop];
-
-        cleaned = cleaned.Trim();
-        return cleaned.Length > 48 ? cleaned[..48].Trim() : cleaned;
     }
 
     private static bool ContainsAny(string text, string[] keywords) =>

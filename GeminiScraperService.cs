@@ -8,7 +8,19 @@ using Microsoft.Web.WebView2.Wpf;
 
 namespace GeminiWidget;
 
-public sealed record PageSnapshot(string Url, string Title, string Text);
+/// <summary>
+/// Estado de la página leída del WebView. <c>Current*</c>/<c>Weekly*</c> provienen
+/// de los bloques <c>data-testid="current-usage"</c> y <c>weekly-usage</c>; si son
+/// null, se usa el texto plano (<see cref="Text"/>) como respaldo.
+/// </summary>
+public sealed record PageSnapshot(
+    string Url,
+    string Title,
+    string Text,
+    double? CurrentPercentage = null,
+    string? CurrentReset = null,
+    double? WeeklyPercentage = null,
+    string? WeeklyReset = null);
 
 /// <summary>
 /// Gestiona el ciclo de vida de WebView2 (instancia invisible), la persistencia
@@ -21,6 +33,30 @@ public sealed class GeminiScraperService
     public static readonly string UserAgent =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
         "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
+
+    /// <summary>
+    /// Lee los bloques de uso por <c>data-testid</c> ("current-usage" / "weekly-usage"),
+    /// que es la fuente fiable. Devuelve además el texto de la página como respaldo.
+    /// </summary>
+    private const string ScrapeScript = """
+        (function () {
+          function read(id) {
+            var el = document.querySelector('[data-testid="' + id + '"]');
+            if (!el) return null;
+            var t = el.innerText || '';
+            var p = t.match(/(\d+)\s*%/);
+            var r = t.match(/Se restablece[^\n]*/i) || t.match(/Resets[^\n]*/i);
+            return { percentage: p ? parseFloat(p[1]) : null, reset: r ? r[0].trim() : null };
+          }
+          return JSON.stringify({
+            url: location.href,
+            title: document.title,
+            text: document.body ? document.body.innerText : '',
+            current: read('current-usage'),
+            weekly: read('weekly-usage')
+          });
+        })()
+        """;
 
     private readonly AppSettings _settings;
     private readonly Dispatcher _dispatcher;
@@ -175,7 +211,19 @@ public sealed class GeminiScraperService
         {
             m.IsAuthenticated = true;
 
-            if (parsed is { Success: true })
+            // Preferimos los bloques estructurados (data-testid). El texto plano
+            // solo se usa como respaldo si Gemini cambia el marcado.
+            if (snapshot.CurrentPercentage is not null || snapshot.WeeklyPercentage is not null)
+            {
+                m.CurrentUsagePercentage = snapshot.CurrentPercentage ?? 0;
+                m.CurrentResetTime = DisplayReset(snapshot.CurrentReset);
+                m.WeeklyUsagePercentage = snapshot.WeeklyPercentage ?? 0;
+                m.WeeklyResetTime = DisplayReset(snapshot.WeeklyReset);
+                m.LastUpdated = DateTime.Now;
+                m.HasData = true;
+                m.StatusMessage = string.Empty;
+            }
+            else if (parsed is { Success: true })
             {
                 m.CurrentUsagePercentage = parsed.CurrentPercentage;
                 m.CurrentResetTime = FormatReset(parsed.CurrentReset);
@@ -223,7 +271,10 @@ public sealed class GeminiScraperService
         {
             token.ThrowIfCancellationRequested();
 
-            if (snapshot.Text.Contains('%') || LooksLikeLogin(snapshot))
+            if (snapshot.Text.Contains('%')
+                || snapshot.CurrentPercentage is not null
+                || snapshot.WeeklyPercentage is not null
+                || LooksLikeLogin(snapshot))
                 return snapshot;
 
             await Task.Delay(1000, token);
@@ -235,11 +286,7 @@ public sealed class GeminiScraperService
 
     private async Task<PageSnapshot> ReadPageAsync()
     {
-        const string script =
-            "JSON.stringify({url:location.href,title:document.title," +
-            "text:(document.body?document.body.innerText:'')})";
-
-        var encoded = await _webView!.ExecuteScriptAsync(script);
+        var encoded = await _webView!.ExecuteScriptAsync(ScrapeScript);
 
         var inner = "{}";
         try { inner = JsonSerializer.Deserialize<string>(encoded) ?? "{}"; }
@@ -249,10 +296,16 @@ public sealed class GeminiScraperService
         {
             using var document = JsonDocument.Parse(inner);
             var root = document.RootElement;
+
+            var current = ReadSection(root, "current");
+            var weekly = ReadSection(root, "weekly");
+
             return new PageSnapshot(
-                root.TryGetProperty("url", out var url) ? url.GetString() ?? string.Empty : string.Empty,
-                root.TryGetProperty("title", out var title) ? title.GetString() ?? string.Empty : string.Empty,
-                root.TryGetProperty("text", out var text) ? text.GetString() ?? string.Empty : string.Empty);
+                GetString(root, "url"),
+                GetString(root, "title"),
+                GetString(root, "text"),
+                current.Percentage, current.Reset,
+                weekly.Percentage, weekly.Reset);
         }
         catch (JsonException)
         {
@@ -272,6 +325,31 @@ public sealed class GeminiScraperService
 
         return hasLoginWords && !text.Contains('%');
     }
+
+    private static (double? Percentage, string? Reset) ReadSection(JsonElement root, string name)
+    {
+        if (!root.TryGetProperty(name, out var section) || section.ValueKind != JsonValueKind.Object)
+            return (null, null);
+
+        double? percentage = null;
+        if (section.TryGetProperty("percentage", out var value) && value.ValueKind == JsonValueKind.Number)
+            percentage = value.GetDouble();
+
+        string? reset = null;
+        if (section.TryGetProperty("reset", out var resetElement) && resetElement.ValueKind == JsonValueKind.String)
+            reset = resetElement.GetString();
+
+        return (percentage, reset);
+    }
+
+    private static string GetString(JsonElement root, string name) =>
+        root.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString() ?? string.Empty
+            : string.Empty;
+
+    /// <summary>Los bloques ya traen la frase completa (p. ej. "Se restablece a las 3:59").</summary>
+    private static string DisplayReset(string? raw) =>
+        string.IsNullOrWhiteSpace(raw) ? "—" : raw.Trim();
 
     private static string FormatReset(string? raw)
     {
@@ -313,6 +391,8 @@ public sealed class GeminiScraperService
                 $"URL: {snapshot.Url}{Environment.NewLine}" +
                 $"TITLE: {snapshot.Title}{Environment.NewLine}" +
                 $"WHEN: {DateTime.Now:O}{Environment.NewLine}" +
+                $"CURRENT: {snapshot.CurrentPercentage?.ToString() ?? "-"} | {snapshot.CurrentReset ?? "-"}{Environment.NewLine}" +
+                $"WEEKLY: {snapshot.WeeklyPercentage?.ToString() ?? "-"} | {snapshot.WeeklyReset ?? "-"}{Environment.NewLine}" +
                 $"-----{Environment.NewLine}{snapshot.Text}");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
