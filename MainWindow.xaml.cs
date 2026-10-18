@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media.Animation;
 
 namespace GeminiWidget;
 
@@ -38,6 +39,25 @@ public partial class MainWindow : Window
     {
         _service.LoginRequired -= OnLoginRequired;
         _service.Shutdown();
+    }
+
+    /// <summary>
+    /// Se llama cuando el usuario intenta abrir el widget estando ya en ejecución.
+    /// En lugar de crear otra instancia, se trae esta al frente y parpadea para
+    /// que el usuario sepa que ya estaba abierto.
+    /// </summary>
+    public void BringToFront()
+    {
+        if (WindowState == WindowState.Minimized)
+            WindowState = WindowState.Normal;
+
+        Activate();
+
+        var animation = new DoubleAnimation(1.0, TimeSpan.FromMilliseconds(220))
+        {
+            AutoReverse = true
+        };
+        BeginAnimation(OpacityProperty, animation);
     }
 
     // Arrastre fluido: se engancha al borde de la tarjeta, no a la ventana,

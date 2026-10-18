@@ -22,6 +22,11 @@ dotnet clean
 ## Architecture (lo no obvio)
 
 - `App.xaml.cs` no usa `StartupUri`: crea `AppSettings` -> `GeminiScraperService` -> `MainWindow`.
+- **Instancia única**: `App.xaml.cs` toma un `Mutex` con nombre
+  (`Local\GeminiWidget.SingleInstance`). Si ya hay una instancia, señaliza un
+  `EventWaitHandle` (`Local\GeminiWidget.Show`) y sale; la instancia viva lo escucha
+  y llama a `MainWindow.BringToFront()`. No quites esto: dos procesos comparten la
+  carpeta de sesión de WebView2 y dejarían dos widgets duplicados.
 - `GeminiScraperService` es dueño de un `WebView2` **invisible**: vive en una ventana
   real de 1x1 fuera de pantalla (`Left=-10000`). WebView2 necesita una ventana para
   inicializarse; no lo reemplaces por `Visibility=Collapsed`.

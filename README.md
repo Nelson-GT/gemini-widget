@@ -132,8 +132,10 @@ Runtime sigue siendo necesario).
    Opcionalmente añade un **retraso de 30 s** al desencadenador para no competir con
    el arranque del sistema.
 
-> El widget **no admite varias instancias a la vez**: dos copias pelean por la misma
-> carpeta de sesión de WebView2. Asegúrate de arrancar solo una.
+> El widget es de **instancia única**. Si intentas abrirlo de nuevo (por ejemplo,
+> pulsando otra vez el acceso directo), **no se crea una segunda copia**: la ventana
+> que ya está abierta parpadea para traerla al frente y el proceso nuevo se cierra
+> solo. Así puedes tenerlo en el arranque de Windows sin miedo a duplicarlo.
 
 ---
 
@@ -212,7 +214,9 @@ App  ──crea──►  GeminiScraperService  ──actualiza──►  UsageM
   login dentro de navegadores embebidos; puede requerir iniciar sesión de otra forma.
 - **Se queda en blanco o con datos viejos.** Clic derecho → *Actualizar ahora*. Si
   persiste, borra `%APPDATA%\GeminiWidget\UserContext` y vuelve a iniciar sesión.
-- **Dos instancias abiertas.** Ciérralas todas y abre solo una.
+- **He abierto el widget dos veces.** Es normal no ver nada nuevo: es de instancia
+  única. La ventana existente parpadea para traerse al frente y la segunda copia se
+  cierra sola.
 
 ---
 
@@ -231,7 +235,8 @@ App  ──crea──►  GeminiScraperService  ──actualiza──►  UsageM
 - Solo **Windows** (WPF + WebView2).
 - Es un *scraping* de la web de Gemini: si Google cambia su interfaz, habrá que
   ajustar `ScrapeScript` en `GeminiScraperService.cs` o `UsageParser.cs`.
-- No soporta múltiples cuentas simultáneas ni múltiples instancias.
+- No soporta múltiples cuentas simultáneas. Es de **instancia única**: no puedes
+  tener dos widgets a la vez.
 
 ---
 
