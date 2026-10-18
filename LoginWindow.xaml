@@ -13,8 +13,17 @@
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0" Background="#26272B" Padding="12,8">
-            <TextBlock Foreground="#C9CDD2" FontSize="12" TextWrapping="Wrap"
-                       Text="Inicia sesión con tu cuenta de Google. La sesión se guarda localmente (misma carpeta que usa el widget), así que solo tendrás que hacerlo una vez." />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Foreground="#C9CDD2" FontSize="12"
+                           TextWrapping="Wrap" VerticalAlignment="Center"
+                           Text="Inicia sesión con tu cuenta de Google. La sesión se guarda localmente, así que solo tendrás que hacerlo una vez. Cuando termines, pulsa «Ya inicié sesión»." />
+                <Button Grid.Column="1" Content="Ya inicié sesión" Margin="12,0,0,0"
+                        Padding="12,5" Cursor="Hand" Click="OnDoneClick" />
+            </Grid>
         </Border>
 
         <wv2:WebView2 Grid.Row="1" x:Name="WebView" />

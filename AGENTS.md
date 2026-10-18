@@ -44,5 +44,13 @@ dotnet clean
   `bin/` no sirve; edita el de la raíz. Se parsea con `System.Text.Json`
   (no hay `Microsoft.Extensions.Configuration`).
 - `UsageUrls` es una lista que se recorre hasta encontrar datos: no asumas que
-  `https://gemini.google.com/usage` es el endpoint correcto.
+  `https://gemini.google.com/usage` es el endpoint correcto (en una sesión sin
+  login redirige a `/app`).
+- Depuración del scraping: cada sondeo deja el `innerText` leído en
+  `%APPDATA%\GeminiWidget\last-scan.txt`. Es lo primero que revisar si no
+  aparecen datos o si no se pide iniciar sesión.
+- La detección de sesión (`LooksLikeLogin`) depende del idioma de la cuenta:
+  español = "Acceder", inglés = "Sign in". Si el widget no pide login en otro
+  idioma, añade la variante ahí. La ventana de login `LoginWindow` solo se cierra
+  al pasar por `accounts.google.com` y volver a Gemini, o con el botón manual.
 - Única dependencia NuGet: `Microsoft.Web.WebView2` (fijada en `1.0.4258.31`).

@@ -159,6 +159,8 @@ public sealed class GeminiScraperService
             }
         }
 
+        DumpSnapshot(snapshot);
+
         if (LooksLikeLogin(snapshot))
         {
             UpdateModel(m =>
@@ -169,7 +171,6 @@ public sealed class GeminiScraperService
             RequestLogin();
             return;
         }
-
         UpdateModel(m =>
         {
             m.IsAuthenticated = true;
@@ -265,8 +266,9 @@ public sealed class GeminiScraperService
             return true;
 
         var text = (snapshot.Text ?? string.Empty).ToLowerInvariant();
-        var hasLoginWords = text.Contains("iniciar sesión") || text.Contains("sign in")
-            || text.Contains("sign-in") || text.Contains("use your google account");
+        var hasLoginWords = text.Contains("iniciar sesión") || text.Contains("inicia sesión")
+            || text.Contains("acceder") || text.Contains("sign in") || text.Contains("sign-in")
+            || text.Contains("log in") || text.Contains("use your google account");
 
         return hasLoginWords && !text.Contains('%');
     }
@@ -292,6 +294,29 @@ public sealed class GeminiScraperService
         _dispatcher.BeginInvoke(new Action(() => LoginRequired?.Invoke(this, EventArgs.Empty)));
 
     private void SetStatus(string status) => UpdateModel(m => m.StatusMessage = status);
+
+    /// <summary>
+    /// Escribe el último texto leído de la página en
+    /// <c>%APPDATA%\GeminiWidget\last-scan.txt</c> para depurar el scraping.
+    /// </summary>
+    private static void DumpSnapshot(PageSnapshot snapshot)
+    {
+        try
+        {
+            var directory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "GeminiWidget");
+            Directory.CreateDirectory(directory);
+
+            File.WriteAllText(
+                Path.Combine(directory, "last-scan.txt"),
+                $"URL: {snapshot.Url}{Environment.NewLine}" +
+                $"TITLE: {snapshot.Title}{Environment.NewLine}" +
+                $"WHEN: {DateTime.Now:O}{Environment.NewLine}" +
+                $"-----{Environment.NewLine}{snapshot.Text}");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+    }
 
     private void UpdateModel(Action<UsageModel> update)
     {
